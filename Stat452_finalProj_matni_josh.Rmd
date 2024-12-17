@@ -1,0 +1,147 @@
+---
+title: "STAT 452 Final Project, Joshua Matni"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+df <- read.table("data.txt", header = TRUE)
+df
+```
+
+# 1. [5 pts] Describe your data. Identify your response variable and predictors.
+
+The dataset contains information on environmental, demographic, and socioeconomic factors that may influence total age-adjusted mortality from all causes, which serves as the response variable (Y) in this analysis. 
+
+Response variable: Y (Total age-adjusted mortality from all causes)
+
+Predictors (15):
+X1 Mean annual precipitation (inches)
+X2 Mean January temperature (degrees Fahrenheit)
+X3 Mean July temperature (degrees Fahrenheit)
+X4 Percent of population over 65 years of age
+X5 Population per household
+X6 Median school years completed
+X7 Percent of housing units that are sound
+X8 Population per square mile
+X9 Percent of nonwhite population
+X10 Percent employment in white-collar jobs
+X11 Percent of families with income under $3000
+X12 Relative pollution potential of hydrocarbons
+X13 Relative pollution potential of oxide of nitrogen
+X14 Relative pollution potential of sulfur dioxide
+X15 Percent relative humidity
+
+
+# 2. [15 pts] Fit a linear regression model
+
+```{r}
+full_model <- lm(Y ~ ., data = df) # '.' means all other columns
+summary(full_model)
+```
+
+# 3. [15 pts] Choose the best model using stepwise selection method. (you may use your favorite selection criterion)
+
+```{r}
+# stepwise selection
+# "both" allows both forward and backward selection. Will try to add and remove variables at each step
+stepwise_model <- step(full_model, direction = "both")
+summary(stepwise_model)
+
+```
+## Model Selection Using Stepwise Procedure
+
+To select the best model, we used stepwise selection with both forward and backward selection, using AIC as the selection criterion. This approach allows predictors to be added or removed at each step based on how much they improve model fit, as measured by AIC. We began with a full model containing 15 predictors.
+
+The final model selected includes the predictors: X1, X2, X3, X4, X5, X6, X9, X12, and X13. The selection process reduced the AIC from 439.79 to 429.64, indicating an improvement in model fit. This model also achieves an Adjusted R-squared of 0.7139, meaning it explains 71.39% of the variability in the response variable (Y). The residual standard error of the model is 33.27, and the F-statistic indicates that at least one predictor is significantly related to Y (p < 0.05).
+
+We selected this model because it strikes a balance between fit (as seen in the lower AIC) and simplicity (only 9 predictors instead of 15). Most predictors are statistically significant (p < 0.05) except for X4, which had a p-value of 0.13245. Although X4 is not significant, it was retained because removing it did not significantly reduce the AIC.
+
+Based on these metrics, we chose Y ~ X1 + X2 + X3 + X4 + X5 + X6 + X9 + X12 + X13 as the best model. This model has a good balance of simplicity, high explanatory power, and low prediction error.
+
+# 4. [15 pts] Check if there is any outlier.
+
+```{r}
+# residuals vs Fitted
+plot(stepwise_model, which = 1, main = "Residuals vs Fitted")
+
+# normal Q-Q Plot
+plot(stepwise_model, which = 2, main = "Normal Q-Q Plot")
+
+# scale-location plot
+plot(stepwise_model, which = 3, main = "Scale-Location Plot")
+
+# residuals vs leverage
+plot(stepwise_model, which = 4, main = "Residuals vs Leverage")
+
+
+
+# which = 1	Residuals vs Fitted
+# which = 2	Normal Q-Q Plot
+# which = 3	Scale-Location (Spread-Location) Plot
+# which = 4	Residuals vs Leverage
+```
+```{r}
+# cook's distance
+cooksD <- cooks.distance(stepwise_model)
+
+# influential points with cook's distance > 4/n
+n <- nrow(df)  # num of obs
+influential_points <- which(cooksD > 4 / n)
+
+# indices of influential points
+print(influential_points)
+
+# rows of the flagged points
+df[influential_points, ]
+```
+## Outlier Detection
+
+Using Cook's Distance, we identified rows 6, 28, 29, 32, 37, and 48 as influential points. These points exceeded the Cook's Distance threshold of 4/n, indicating they have a significant impact on the model.
+
+These points should be carefully investigated to determine whether they are valid observations or data entry errors. If valid, they can be retained, but their influence should be noted.
+
+# 5. [40 pts] For the model you chose in Question 3, check the following assumptions using both residual plots and statistical tests (if any). If any of the assumptions is violated, try to remedy the problem. If you cannot resolve the problem, simply state which assumption is violated and what methods you tried. Then, clearly present what the final model is.
+
+### (a) The relationship between the response and the regressors is linear, at least approximately.
+### (b) The error term ε has mean zero and constant variance σ2.
+### (c) The errors are uncorrelated.
+### (d) The errors are normally distributed.
+### (e) The regressors are linearly independent.
+
+
+```{r}
+# Assumption 1: Linearity -- part a
+plot(stepwise_model, which = 1, main = "Residuals vs Fitted")
+
+# Assumption 2: Constant Variance -- part b
+plot(stepwise_model, which = 3, main = "Scale-Location Plot")
+
+# Assumption 3: Uncorrelated Errors -- part c
+install.packages("lmtest")
+library(lmtest)
+dwtest(stepwise_model)
+
+# Assumption 4: Normality of Residuals -- part d
+plot(stepwise_model, which = 2, main = "Normal Q-Q Plot")
+shapiro.test(residuals(stepwise_model))
+
+# Assumption 5: Multicollinearity -- part e
+library(car)
+vif(stepwise_model)
+```
+
+
+## Interpretation of Model Assumptions
+
+To assess the validity of the linear regression model, several diagnostic checks were performed. The Residuals vs Fitted plot indicates that the residuals are randomly scattered around the horizontal line, suggesting that the assumption of linearity is reasonably satisfied. The Scale-Location plot shows a relatively consistent spread of residuals across the fitted values, though a slight upward trend at higher fitted values suggests mild heteroscedasticity. While this indicates minor deviations from constant variance, the effect is not severe enough to undermine the model’s validity.
+
+The Normal Q-Q plot and the Shapiro-Wilk test (W = 0.98349, p-value = 0.5923) confirm that the residuals are approximately normally distributed, with only minor deviations at the tails. The Durbin-Watson test (DW = 2.1841, p-value = 0.7436) shows no significant autocorrelation in the residuals, satisfying this assumption.
+
+Finally, the VIF values reveal high multicollinearity between predictors X12 and X13, with values exceeding 10 (45.94 and 42.50, respectively). To address this, one of these predictors should be removed, or a dimensionality reduction method, such as Principal Component Analysis (PCA), should be applied.
+
+Overall, while the assumptions of linearity, normality, and no autocorrelation are satisfied, minor heteroscedasticity and multicollinearity should be noted and addressed to improve the model’s stability and reliability.
+
